@@ -158,7 +158,7 @@ html, body, [class*="css"], .stApp {
     color: #EEEEF2 !important;
 }
 .stApp > header { background: transparent !important; }
-.block-container { padding: 1rem 1.5rem !important; max-width: 100% !important; }
+.block-container { padding: 4rem 1.5rem !important; max-width: 100% !important; }
 
 section[data-testid="stSidebar"] {
     background: #0D0F18 !important;
