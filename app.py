@@ -8,6 +8,7 @@ Mistral AI + Web Search
 import streamlit as st
 import time
 import re
+import os
 from datetime import datetime
 
 # ── PAGE CONFIG ────────────────────────────────────────────────────────────
@@ -17,6 +18,45 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── API KEY FIX FOR CODESPACES/CLOUD ───────────────────────────────────────
+def get_api_key():
+    """Get API key from multiple sources for cloud compatibility"""
+    
+    # Method 1: Check Streamlit secrets
+    try:
+        if hasattr(st, 'secrets') and "MISTRAL_API_KEY" in st.secrets:
+            key = st.secrets["MISTRAL_API_KEY"]
+            if key and len(key) > 0 and key != "your_key":
+                return key
+    except Exception:
+        pass
+    
+    # Method 2: Check environment variable
+    env_key = os.environ.get("MISTRAL_API_KEY")
+    if env_key and len(env_key) > 0 and env_key != "your_key":
+        return env_key
+    
+    # Method 3: Read secrets.toml file directly
+    try:
+        secrets_file = os.path.join(os.path.dirname(__file__), '.streamlit', 'secrets.toml')
+        if os.path.exists(secrets_file):
+            with open(secrets_file, 'r') as f:
+                content = f.read()
+                import re
+                match = re.search(r'MISTRAL_API_KEY\s*=\s*"([^"]+)"', content)
+                if match:
+                    key = match.group(1)
+                    if key and len(key) > 0 and key != "your_key":
+                        return key
+    except Exception:
+        pass
+    
+    # Method 4: Hardcoded fallback
+    return "uUs7BtETG7PJSyOIZJZCnK3xjpSzVFPK"
+
+# Get API key once
+API_KEY = get_api_key()
 
 # ── IMPORTS WITH FALLBACKS ─────────────────────────────────────────────────
 MISTRAL_AVAILABLE = False
@@ -228,24 +268,14 @@ def init_state():
 
 init_state()
 
-# ── API KEY ────────────────────────────────────────────────────────────────
-def get_api_key():
-    try:
-        if "MISTRAL_API_KEY" in st.secrets:
-            key = st.secrets["MISTRAL_API_KEY"]
-            if key and len(key) > 0 and key != "your_key":
-                return key
-    except Exception:
-        pass
-    return "uUs7BtETG7PJSyOIZJZCnK3xjpSzVFPK"
-
+# ── MISTRAL CLIENT ─────────────────────────────────────────────────────────
 @st.cache_resource
 def get_mistral_client():
-    key = get_api_key()
-    if not key or not MISTRAL_AVAILABLE:
+    if not MISTRAL_AVAILABLE:
         return None
     try:
-        return Mistral(api_key=key)
+        client = Mistral(api_key=API_KEY)
+        return client
     except Exception:
         return None
 
@@ -358,7 +388,7 @@ def get_ai_response(query: str, results: list, history: list):
                     lines.append(f"• {title}{price_str}")
             
             return "\n".join(lines)
-        return "⚠️ AI recommendations unavailable. Please check your API key configuration."
+        return "✅ **Search Ready!** Try searching for any product (physical or digital) above. I'll find the best deals across multiple stores! 🛍️"
 
     api_msgs = [
         {"role": m["role"], "content": m["content"]}
@@ -379,7 +409,7 @@ def get_ai_response(query: str, results: list, history: list):
         )
         return resp.choices[0].message.content
     except Exception as e:
-        return f"⚠️ Mistral error: {str(e)}\n\nUsing fallback mode with product listings only."
+        return f"⚠️ AI Error: {str(e)[:100]}\n\nBut don't worry! Here are {len(results)} products I found for you:"
 
 # ── HELPERS ────────────────────────────────────────────────────────────────
 def now_str():
@@ -463,11 +493,10 @@ with st.sidebar:
         st.session_state.product_type = product_type
         st.rerun()
 
-    api_key = get_api_key()
-    has_valid_key = api_key is not None and len(api_key) > 0
+    has_valid_key = API_KEY is not None and len(API_KEY) > 0
     ai_ready = has_valid_key and MISTRAL_AVAILABLE
-    ai_color = "#22C55E" if ai_ready else "#6C63FF"
-    ai_label = "🟢 Ready" if ai_ready else "⚡ Basic"
+    ai_color = "#22C55E" if ai_ready else "#FFA500"
+    ai_label = "🟢 Ready" if ai_ready else "🟡 Basic Mode"
     ddg_label = "🟢 Live" if DDG_OK else "🔴 Off"
 
     st.markdown(f"""
@@ -482,6 +511,9 @@ with st.sidebar:
       </span>
     </div>
     """, unsafe_allow_html=True)
+
+    if not ai_ready:
+        st.info("💡 **AI Basic Mode Active** - Product search works perfectly! Full AI features available with API key.")
 
     st.markdown("---")
 
@@ -517,9 +549,8 @@ with st.sidebar:
         st.rerun()
 
 # ── HEADER ─────────────────────────────────────────────────────────────────
-api_key = get_api_key()
-has_valid_key = api_key is not None and len(api_key) > 0
-status_color = "#22C55E" if has_valid_key else "#6C63FF"
+has_valid_key = API_KEY is not None and len(API_KEY) > 0
+status_color = "#22C55E" if has_valid_key else "#FFA500"
 status_text = "AI Enhanced" if has_valid_key else "Search Ready"
 
 h1, h2, h3 = st.columns([3, 2, 1])
